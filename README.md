@@ -64,8 +64,12 @@ npm test       # unit tests (Node 18+)
 
 ## Deploy
 
-It is a static site: publish the repo root to GitHub Pages, Netlify,
-Cloudflare Pages, etc. Hosting cost is just static files.
+It is a static site. Pushes to `main` are deployed to GitHub Pages by
+`.github/workflows/pages.yml` (tests run first). One-time setup: in the
+repo's **Settings → Pages**, set **Source** to **GitHub Actions**.
+
+The live URL is `https://<owner>.github.io/<repo>/`. Any other static host
+(Netlify, Cloudflare Pages, …) works too; there is no build step.
 
 ## Limits
 

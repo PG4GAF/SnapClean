@@ -53,6 +53,8 @@ body {
   background: var(--surface);
 }
 
+.topbar-actions { display: flex; gap: 8px; }
+
 .brand { margin: 0; font-size: 1.25rem; letter-spacing: -0.02em; }
 .brand span { color: var(--primary); }
 
@@ -246,6 +248,8 @@ input[type="range"] {
 .row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 
 .export { display: flex; flex-direction: column; gap: 6px; }
+.export-buttons { display: flex; gap: 8px; }
+.export-buttons .btn-block { flex: 1; width: auto; }
 
 /* On phones pin the download bar to the bottom of the screen. */
 @media (max-width: 899px) {

@@ -18,6 +18,28 @@ canvas + JavaScript: no server, no uploads, no account, no watermark.
    **Hold to see original** to compare.
 5. **Download PNG** exports at the image's original pixel dimensions.
 
+## Android
+
+SnapClean is an installable Progressive Web App, so on Android it behaves
+like a native app without a separate codebase or Play Store listing:
+
+- **Install:** open the site in Chrome and tap **Install app** (or menu →
+  *Install app* / *Add to Home screen*). It gets its own icon and opens
+  full-screen.
+- **Works offline** once installed (`sw.js` caches the app).
+- **Share into SnapClean:** after installing, the app appears in Android's
+  share sheet, so you can share a photo from Gallery/Photos straight in.
+- **Share / save out:** the **Share** button hands the PNG to Android's
+  share sheet (save to Photos, Drive, messaging apps…). **Download PNG**
+  saves to *Downloads*.
+- The Android **back** button returns from the editor to the start screen.
+
+Install, offline use and sharing need the site served over HTTPS
+(GitHub Pages, Netlify, etc.); opening `index.html` as a file still works
+for basic use. If you later want a Play Store listing, the PWA can be
+wrapped as a Trusted Web Activity with [Bubblewrap](https://github.com/GoogleChromeLabs/bubblewrap)
+or [PWABuilder](https://www.pwabuilder.com/) without changing the code.
+
 ## Project layout
 
 | File | Purpose |
@@ -25,7 +47,10 @@ canvas + JavaScript: no server, no uploads, no account, no watermark.
 | `index.html` | Single page |
 | `css/style.css` | Mobile-first styles (light/dark) |
 | `js/core.js` | Pure pixel processing: scanline flood fill, edge smoothing. No DOM, unit-tested in Node |
-| `js/app.js` | UI: loading, tap-to-pick, preview, export |
+| `js/app.js` | UI: loading, tap-to-pick, preview, export, share, install |
+| `manifest.webmanifest` | PWA manifest (install, icons, Android share target) |
+| `sw.js` | Service worker: offline cache + receiving shared images |
+| `icons/` | App icons (regular + Android maskable) |
 | `test/core.test.js` | Tests for `core.js` |
 
 No build step and no dependencies.

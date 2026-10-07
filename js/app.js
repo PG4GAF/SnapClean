@@ -26,6 +26,8 @@
     compareBtn: $('compareBtn'),
     downloadBtn: $('downloadBtn'),
     sizeInfo: $('sizeInfo'),
+    shareBtn: $('shareBtn'),
+    installBtn: $('installBtn'),
   };
 
   var ctx = els.canvas.getContext('2d', { willReadFrequently: true });
@@ -43,8 +45,21 @@
 
   // ---------- Loading ----------
 
+  // Some Android file pickers and share sources omit the MIME type, so fall
+  // back to the file extension.
+  function fileKind(file) {
+    if (!file) return null;
+    if (file.type === 'image/png') return 'png';
+    if (file.type === 'image/jpeg') return 'jpeg';
+    if (!file.type || file.type === 'application/octet-stream') {
+      if (/\.png$/i.test(file.name)) return 'png';
+      if (/\.jpe?g$/i.test(file.name)) return 'jpeg';
+    }
+    return null;
+  }
+
   function isSupported(file) {
-    return file && /^image\/(png|jpeg)$/.test(file.type);
+    return fileKind(file) !== null;
   }
 
   function loadFile(file) {
@@ -58,7 +73,7 @@
     var img = new Image();
     img.onload = function () {
       try {
-        setupImage(img, file.type === 'image/jpeg');
+        setupImage(img, fileKind(file) === 'jpeg');
       } catch (err) {
         console.error(err);
         alert('This image is too large for your browser to process (' +
@@ -102,6 +117,16 @@
     refreshControls();
     els.status.textContent = '';
     window.scrollTo(0, 0);
+    // Give the editor its own history entry so Android's back button returns
+    // to the start screen instead of leaving the app.
+    if (!history.state || !history.state.editor) history.pushState({ editor: true }, '');
+  }
+
+  // "New image" button: go back through history when we pushed an entry, so
+  // the back stack stays in sync; popstate then does the reset.
+  function leaveEditor() {
+    if (history.state && history.state.editor) history.back();
+    else resetToStart();
   }
 
   function resetToStart() {
@@ -203,6 +228,7 @@
     els.undoBtn.disabled = !has;
     els.resetBtn.disabled = !has;
     els.downloadBtn.disabled = !has;
+    els.shareBtn.disabled = !has;
     els.hint.textContent = has
       ? 'Tap other background areas to remove them too. Raise tolerance if edges remain.'
       : 'Tap the background colour you want to remove.';
@@ -243,32 +269,64 @@
 
   // ---------- Export ----------
 
-  function download() {
+  function outputName() {
+    return state.fileName + '-transparent.png';
+  }
+
+  // Encode the current result as a full-resolution PNG blob.
+  function makePng(button, done) {
     if (!state.out) return;
+    if (state.pending) runUpdate();
     // The preview canvas holds the full-resolution result (CSS only scales it
     // for display), so export straight from it; no second canvas in memory.
-    if (state.pending) runUpdate();
     setComparing(false);
     ctx.putImageData(state.out, 0, 0);
-    els.downloadBtn.disabled = true;
-    var label = els.downloadBtn.textContent;
-    els.downloadBtn.textContent = 'Preparing PNG…';
+    var label = button.textContent;
+    els.downloadBtn.disabled = els.shareBtn.disabled = true;
+    button.textContent = 'Preparing…';
     els.canvas.toBlob(function (blob) {
-      els.downloadBtn.disabled = false;
-      els.downloadBtn.textContent = label;
+      els.downloadBtn.disabled = els.shareBtn.disabled = false;
+      button.textContent = label;
       if (!blob) {
         alert('Sorry, your browser could not create the PNG.');
         return;
       }
+      done(blob);
+    }, 'image/png');
+  }
+
+  function download() {
+    makePng(els.downloadBtn, function (blob) {
       var url = URL.createObjectURL(blob);
       var a = document.createElement('a');
       a.href = url;
-      a.download = state.fileName + '-transparent.png';
+      a.download = outputName();
       document.body.appendChild(a);
       a.click();
       a.remove();
       setTimeout(function () { URL.revokeObjectURL(url); }, 60000);
-    }, 'image/png');
+    });
+  }
+
+  // Android/iOS share sheet: lets people save straight to Photos/Gallery or
+  // send the PNG to another app.
+  var canShareFiles = (function () {
+    try {
+      return !!(navigator.canShare && typeof File === 'function' &&
+        navigator.canShare({ files: [new File([''], 'x.png', { type: 'image/png' })] }));
+    } catch (e) {
+      return false;
+    }
+  })();
+
+  function share() {
+    makePng(els.shareBtn, function (blob) {
+      var file = new File([blob], outputName(), { type: 'image/png' });
+      navigator.share({ files: [file], title: outputName() }).catch(function (err) {
+        // AbortError = the person closed the share sheet.
+        if (err && err.name !== 'AbortError') download();
+      });
+    });
   }
 
   // ---------- Wiring ----------
@@ -276,7 +334,10 @@
   els.fileInput.addEventListener('change', function () {
     loadFile(els.fileInput.files[0]);
   });
-  els.newImageBtn.addEventListener('click', resetToStart);
+  els.newImageBtn.addEventListener('click', leaveEditor);
+  window.addEventListener('popstate', function () {
+    if (state.src && !(history.state && history.state.editor)) resetToStart();
+  });
 
   // Drag & drop anywhere on the page.
   ['dragenter', 'dragover'].forEach(function (type) {
@@ -355,4 +416,50 @@
   });
 
   els.downloadBtn.addEventListener('click', download);
+  if (canShareFiles) {
+    els.shareBtn.hidden = false;
+    els.shareBtn.addEventListener('click', share);
+  }
+
+  // ---------- Installable app (PWA) ----------
+
+  var installEvent = null;
+  window.addEventListener('beforeinstallprompt', function (e) {
+    e.preventDefault();
+    installEvent = e;
+    els.installBtn.hidden = false;
+  });
+  els.installBtn.addEventListener('click', function () {
+    if (!installEvent) return;
+    installEvent.prompt();
+    installEvent.userChoice.finally(function () {
+      installEvent = null;
+      els.installBtn.hidden = true;
+    });
+  });
+  window.addEventListener('appinstalled', function () {
+    els.installBtn.hidden = true;
+  });
+
+  if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
+    navigator.serviceWorker.register('sw.js').catch(function (err) {
+      console.warn('Service worker registration failed', err);
+    });
+  }
+
+  // An image shared from another app (Android share sheet) arrives via the
+  // service worker, which parks it in a cache and redirects here.
+  if (/[?&]shared=1/.test(location.search) && 'caches' in window) {
+    history.replaceState(null, '', location.pathname);
+    caches.open('snapclean-share').then(function (cache) {
+      return cache.match('shared-image').then(function (res) {
+        if (!res) return;
+        var name = decodeURIComponent(res.headers.get('X-File-Name') || 'image');
+        return res.blob().then(function (blob) {
+          cache.delete('shared-image');
+          loadFile(new File([blob], name, { type: blob.type }));
+        });
+      });
+    });
+  }
 })();

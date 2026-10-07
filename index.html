@@ -5,14 +5,20 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>SnapClean – Remove Solid Backgrounds</title>
   <meta name="description" content="Remove a solid-colour background from a PNG or JPG and download a full-resolution transparent PNG. Free, private, runs in your browser.">
-  <meta name="theme-color" content="#0f172a">
+  <meta name="theme-color" content="#4f46e5">
+  <meta name="mobile-web-app-capable" content="yes">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%234f46e5'/%3E%3Cpath d='M9 22l5-9 4 6 2-3 3 6z' fill='white'/%3E%3C/svg%3E">
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
   <header class="topbar">
     <h1 class="brand">Snap<span>Clean</span></h1>
-    <button id="newImageBtn" class="btn btn-ghost" type="button" hidden>New image</button>
+    <div class="topbar-actions">
+      <button id="installBtn" class="btn btn-ghost" type="button" hidden>Install app</button>
+      <button id="newImageBtn" class="btn btn-ghost" type="button" hidden>New image</button>
+    </div>
   </header>
 
   <main>
@@ -24,7 +30,7 @@
         <p class="dropzone-sub">PNG or JPG · stays on your device · full-resolution PNG out</p>
         <label class="btn btn-primary btn-lg">
           Choose image
-          <input id="fileInput" type="file" accept="image/png,image/jpeg" hidden>
+          <input id="fileInput" type="file" accept="image/png,image/jpeg,.png,.jpg,.jpeg" hidden>
         </label>
         <p class="dropzone-hint">or drag &amp; drop / paste an image</p>
       </div>
@@ -90,7 +96,10 @@
         <button id="compareBtn" class="btn btn-block" type="button">Hold to see original</button>
 
         <div class="export">
-          <button id="downloadBtn" class="btn btn-primary btn-block btn-lg" type="button" disabled>Download PNG</button>
+          <div class="export-buttons">
+            <button id="downloadBtn" class="btn btn-primary btn-block btn-lg" type="button" disabled>Download PNG</button>
+            <button id="shareBtn" class="btn btn-lg" type="button" disabled hidden aria-label="Share or save to Photos">Share</button>
+          </div>
           <p id="sizeInfo" class="field-help center"></p>
         </div>
       </aside>

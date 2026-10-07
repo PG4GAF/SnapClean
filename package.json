@@ -1,0 +1,10 @@
+{
+  "name": "snapclean",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Remove a solid-colour background from an image in the browser and export a transparent PNG.",
+  "scripts": {
+    "start": "npx http-server -p 8080 -c-1 .",
+    "test": "node --test test/*.test.js"
+  }
+}

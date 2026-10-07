@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>SnapClean – Remove Solid Backgrounds</title>
+  <meta name="description" content="Remove a solid-colour background from a PNG or JPG and download a full-resolution transparent PNG. Free, private, runs in your browser.">
+  <meta name="theme-color" content="#0f172a">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%234f46e5'/%3E%3Cpath d='M9 22l5-9 4 6 2-3 3 6z' fill='white'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <h1 class="brand">Snap<span>Clean</span></h1>
+    <button id="newImageBtn" class="btn btn-ghost" type="button" hidden>New image</button>
+  </header>
+
+  <main>
+    <!-- Step 1: pick a file -->
+    <section id="dropZone" class="dropzone">
+      <div class="dropzone-inner">
+        <svg class="dropzone-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4m0 0l-4 4m4-4l4 4M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <p class="dropzone-title">Remove a solid background</p>
+        <p class="dropzone-sub">PNG or JPG · stays on your device · full-resolution PNG out</p>
+        <label class="btn btn-primary btn-lg">
+          Choose image
+          <input id="fileInput" type="file" accept="image/png,image/jpeg" hidden>
+        </label>
+        <p class="dropzone-hint">or drag &amp; drop / paste an image</p>
+      </div>
+    </section>
+
+    <!-- Step 2: edit -->
+    <section id="editor" class="editor" hidden>
+      <div class="stage-wrap">
+        <p id="hint" class="hint">Tap the background colour you want to remove.</p>
+        <div id="stage" class="stage bg-checker">
+          <div id="canvasBox" class="canvas-box">
+            <canvas id="canvas" aria-label="Image preview. Tap to pick the background colour."></canvas>
+            <div id="markers" class="markers" aria-hidden="true"></div>
+          </div>
+        </div>
+        <p id="status" class="status" aria-live="polite"></p>
+      </div>
+
+      <aside class="panel">
+        <div class="field">
+          <div class="field-head">
+            <label for="tolerance">Tolerance</label>
+            <output id="toleranceOut" for="tolerance">20</output>
+          </div>
+          <input id="tolerance" type="range" min="0" max="100" value="20" step="1">
+          <p class="field-help">Higher catches more shades of the background colour.</p>
+        </div>
+
+        <div class="field">
+          <div class="field-head">
+            <label for="softness">Edge smoothing</label>
+            <output id="softnessOut" for="softness">30</output>
+          </div>
+          <input id="softness" type="range" min="0" max="100" value="30" step="1">
+          <p class="field-help">Fades anti-aliased edges and removes colour fringes.</p>
+        </div>
+
+        <label class="check">
+          <input id="contiguous" type="checkbox" checked>
+          <span>Only connected areas</span>
+        </label>
+        <p class="field-help">Turn off to also remove matching colour enclosed by the subject (e.g. inside letters).</p>
+
+        <div class="field">
+          <span class="field-label">Picked colours</span>
+          <div id="swatches" class="swatches"><span class="muted">None yet</span></div>
+        </div>
+
+        <div class="field">
+          <span class="field-label">Preview background</span>
+          <div class="bg-options" role="radiogroup" aria-label="Preview background">
+            <button type="button" class="bg-opt bg-checker is-active" data-bg="checker" aria-label="Checkerboard" role="radio" aria-checked="true"></button>
+            <button type="button" class="bg-opt" data-bg="white" style="background:#fff" aria-label="White" role="radio" aria-checked="false"></button>
+            <button type="button" class="bg-opt" data-bg="black" style="background:#000" aria-label="Black" role="radio" aria-checked="false"></button>
+            <button type="button" class="bg-opt" data-bg="magenta" style="background:#ff00ff" aria-label="Magenta" role="radio" aria-checked="false"></button>
+          </div>
+        </div>
+
+        <div class="row">
+          <button id="undoBtn" class="btn" type="button" disabled>Undo pick</button>
+          <button id="resetBtn" class="btn" type="button" disabled>Reset</button>
+        </div>
+        <button id="compareBtn" class="btn btn-block" type="button">Hold to see original</button>
+
+        <div class="export">
+          <button id="downloadBtn" class="btn btn-primary btn-block btn-lg" type="button" disabled>Download PNG</button>
+          <p id="sizeInfo" class="field-help center"></p>
+        </div>
+      </aside>
+    </section>
+  </main>
+
+  <footer class="footer">
+    Images never leave your device. No sign-up, no watermark.
+  </footer>
+
+  <script src="js/core.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

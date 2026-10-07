@@ -149,9 +149,9 @@ main {
   border: 1px solid var(--border);
   padding: 12px;
   display: flex;
-  justify-content: center;
-  align-items: center;
-  overflow: hidden;
+  max-height: 70vh;
+  overflow: auto;
+  overscroll-behavior: contain;
 }
 
 .bg-checker {
@@ -171,17 +171,97 @@ main {
 .canvas-box {
   position: relative;
   line-height: 0;
-  max-width: 100%;
+  /* margin:auto centres the image but, unlike justify-content, keeps all of
+     it reachable by scrolling when zoomed in. */
+  margin: auto;
+  flex: none;
 }
 
+/* Width/height are set from JS (fit-to-screen × zoom). */
 #canvas {
   display: block;
-  max-width: 100%;
-  max-height: 70vh;
-  height: auto;
   cursor: crosshair;
-  touch-action: manipulation;
+  touch-action: pan-x pan-y pinch-zoom;
 }
+#canvas.is-pixelated { image-rendering: pixelated; }
+.tool-area #canvas { touch-action: none; }
+
+/* Toolbar */
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.tool-group {
+  display: flex;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 3px;
+  gap: 2px;
+}
+.tool {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  font-size: 0.9rem;
+  min-height: 40px;
+  min-width: 40px;
+  padding: 6px 10px;
+  border-radius: 7px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  cursor: pointer;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.tool svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.tool:hover:not(:disabled) { background: color-mix(in srgb, var(--text) 7%, transparent); }
+.tool:disabled { opacity: 0.4; cursor: not-allowed; }
+.tool.is-active { background: var(--primary); color: var(--primary-text); }
+.tool-icon { padding: 6px; }
+.tool-zoom { min-width: 58px; font-variant-numeric: tabular-nums; }
+.tool:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--primary) 50%, transparent);
+  outline-offset: 1px;
+}
+
+/* Area selection */
+.selection {
+  position: absolute;
+  border: 2px dashed var(--primary);
+  background: color-mix(in srgb, var(--primary) 18%, transparent);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.8);
+  pointer-events: none;
+}
+.area-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.area-bar-label { font-weight: 600; font-size: 0.9rem; margin-right: 2px; }
+.btn-sm { min-height: 38px; padding: 6px 10px; font-size: 0.9rem; }
 
 .markers { position: absolute; inset: 0; pointer-events: none; }
 .marker {
@@ -266,7 +346,16 @@ input[type="range"] {
     box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.08);
   }
   body.is-editing { padding-bottom: 96px; }
-  #canvas { max-height: 55vh; }
+  .stage { max-height: 55vh; }
+  /* Icon-only undo/redo on phones keeps the toolbar compact. */
+  .tool-group .tool[id] span { display: none; }
+}
+
+@media (max-width: 479px) {
+  /* Small phones: icon-only tools so the whole toolbar fits on one row. */
+  .tool span { display: none; }
+  .toolbar { gap: 6px; }
+  .tool-zoom { min-width: 52px; }
 }
 
 body.is-busy #canvas { cursor: progress; }

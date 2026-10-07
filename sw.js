@@ -4,7 +4,7 @@
  * - Receives images shared from other Android apps (Web Share Target) and
  *   hands them to the page via a temporary cache entry.
  */
-var VERSION = 'snapclean-v1';
+var VERSION = 'snapclean-v2';
 var SHARE_CACHE = 'snapclean-share';
 var SHELL = [
   './',

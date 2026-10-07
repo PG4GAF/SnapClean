@@ -99,3 +99,41 @@ test('handles a large image without stack overflow', () => {
   assert.strictEqual(r.removed, w * h - 1000 * 1000);
   assert.ok(Date.now() - t < 5000);
 });
+
+test('area "remove" clears matching colour only inside the box, even if enclosed', () => {
+  // White image, black ring with a white hole at (4,4); a second white hole at (1,1) outside the box.
+  const w = 9, h = 9;
+  const src = makeImage(w, h, [255, 255, 255, 255], [0, 0, 0, 255], { x0: 2, x1: 7, y0: 2, y1: 7 });
+  src.set([255, 255, 255, 255], (4 * w + 4) * 4);
+  const dst = new Uint8ClampedArray(src.length);
+  const areas = [{ type: 'remove', x0: 3, y0: 3, x1: 6, y1: 6, colors: [[255, 255, 255, 255]] }];
+  Core.process(src, dst, w, h, [], { tolerance: 5, edgeSoftness: 0, areas });
+  assert.strictEqual(alphaAt(dst, w, 4, 4), 0, 'enclosed hole inside the box removed');
+  assert.strictEqual(alphaAt(dst, w, 3, 3), 255, 'black inside the box kept');
+  assert.strictEqual(alphaAt(dst, w, 0, 0), 255, 'white outside the box untouched');
+});
+
+test('area "erase" clears everything in the box; "keep" restores it', () => {
+  const w = 10, h = 10;
+  const src = makeImage(w, h, [255, 255, 255, 255], [0, 0, 0, 255], { x0: 3, x1: 7, y0: 3, y1: 7 });
+  const dst = new Uint8ClampedArray(src.length);
+  const erase = { type: 'erase', x0: 4, y0: 4, x1: 6, y1: 6 };
+  Core.process(src, dst, w, h, [], { tolerance: 5, edgeSoftness: 30, areas: [erase] });
+  assert.strictEqual(alphaAt(dst, w, 5, 5), 0);
+  assert.strictEqual(alphaAt(dst, w, 3, 3), 255);
+  // Tap-remove the white background, then protect the top-left corner.
+  const keep = { type: 'keep', x0: 0, y0: 0, x1: 2, y1: 2 };
+  Core.process(src, dst, w, h, [{ x: 9, y: 9 }], { tolerance: 5, edgeSoftness: 30, areas: [erase, keep] });
+  assert.strictEqual(alphaAt(dst, w, 0, 0), 255, 'kept corner restored');
+  assert.strictEqual(alphaAt(dst, w, 9, 9), 0, 'rest of background removed');
+  assert.strictEqual(alphaAt(dst, w, 5, 5), 0, 'earlier erase still applies');
+});
+
+test('area boxes are clipped to the image and order-independent of drag direction', () => {
+  const w = 4, h = 4;
+  const src = makeImage(w, h, [10, 10, 10, 255]);
+  const dst = new Uint8ClampedArray(src.length);
+  Core.process(src, dst, w, h, [], { tolerance: 0, areas: [{ type: 'erase', x0: 10, y0: 10, x1: 2, y1: 2 }] });
+  assert.strictEqual(alphaAt(dst, w, 3, 3), 0);
+  assert.strictEqual(alphaAt(dst, w, 1, 1), 255);
+});

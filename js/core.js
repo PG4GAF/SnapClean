@@ -13,8 +13,10 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  // Maximum number of picks; seed indices are stored in a Uint8Array.
+  // Maximum number of picked colours; colour ids are stored in a Uint8Array.
   var MAX_SEEDS = 254;
+  // Mask id for pixels erased by an area (no background colour to unmix).
+  var ERASED = 255;
 
   // Reused between calls: re-running on every slider move would otherwise
   // allocate a pixel-count-sized buffer each time.
@@ -130,7 +132,7 @@
    * background (anti-aliased edges) get partial alpha, and the background
    * colour is "unmixed" from them so no coloured halo remains.
    */
-  function render(src, dst, width, height, seeds, mask, options) {
+  function render(src, dst, width, height, colors, mask, protect, options) {
     dst.set(src);
     var n = width * height;
     var p;
@@ -142,22 +144,18 @@
     }
 
     var softness = Math.max(0, Math.min(100, options.edgeSoftness || 0));
-    if (softness === 0 || seeds.length === 0) return dst;
+    if (softness === 0 || colors.length === 0) return dst;
 
     var tol = toleranceToDistance(options.tolerance);
     // Pixels within [tol, tol + band] of the background colour fade out.
     var band = Math.max(1, (softness / 100) * 160);
     var rings = 2; // anti-aliasing rarely spans more than a couple of pixels
-    var colors = seeds.map(function (s) {
-      return colorAt(src, width, s.x, s.y);
-    });
-
     // ringOwner[p] = seed id that the edge pixel blends with.
     var ringOwner = new Uint8Array(n);
     var frontier = [];
     var x, y, k;
     for (p = 0; p < n; p++) {
-      if (mask[p] === 0) continue;
+      if (mask[p] === 0 || mask[p] === ERASED) continue;
       x = p % width;
       y = (p / width) | 0;
       // Only kept neighbours matter; this keeps the frontier to the outline.
@@ -172,7 +170,7 @@
       for (k = 0; k < frontier.length; k += 2) {
         p = frontier[k];
         var id = frontier[k + 1];
-        if (mask[p] !== 0 || ringOwner[p] !== 0) continue;
+        if (mask[p] !== 0 || ringOwner[p] !== 0 || (protect && protect[p])) continue;
         var c = colors[id - 1];
         var i4 = p * 4;
         var d = distance(src, i4, c);
@@ -207,9 +205,76 @@
     return dst;
   }
 
+  function clipRect(r, width, height) {
+    var x0 = Math.max(0, Math.min(width, Math.floor(Math.min(r.x0, r.x1))));
+    var x1 = Math.max(0, Math.min(width, Math.ceil(Math.max(r.x0, r.x1))));
+    var y0 = Math.max(0, Math.min(height, Math.floor(Math.min(r.y0, r.y1))));
+    var y1 = Math.max(0, Math.min(height, Math.ceil(Math.max(r.y0, r.y1))));
+    return { x0: x0, y0: y0, x1: x1, y1: y1 };
+  }
+
+  /*
+   * Apply rectangular area edits, in order, on top of the tap-based mask.
+   *
+   * areas   [{type: 'remove'|'erase'|'keep', x0, y0, x1, y1, colors?}]
+   *   remove: pixels inside the box matching any of `colors` (within the
+   *           tolerance) become transparent, connected or not.
+   *   erase:  everything inside the box becomes transparent.
+   *   keep:   everything inside the box is kept, overriding earlier removal.
+   * colors  colour table, extended in place with each remove area's colours
+   *         so render() can unmix their edges.
+   *
+   * Returns a Uint8Array marking kept ("protected") pixels, or null.
+   */
+  function applyAreas(src, width, height, mask, areas, colors, options) {
+    if (!areas || !areas.length) return null;
+    var protect = new Uint8Array(width * height);
+    var maxDist = toleranceToDistance(options.tolerance);
+    for (var a = 0; a < areas.length; a++) {
+      var area = areas[a];
+      var r = clipRect(area, width, height);
+      var ids = [];
+      if (area.type === 'remove') {
+        var cs = area.colors || [];
+        for (var c = 0; c < cs.length && colors.length < MAX_SEEDS; c++) {
+          colors.push(cs[c]);
+          ids.push(colors.length);
+        }
+      }
+      for (var y = r.y0; y < r.y1; y++) {
+        for (var p = y * width + r.x0, end = y * width + r.x1; p < end; p++) {
+          if (area.type === 'erase') {
+            mask[p] = ERASED;
+            protect[p] = 0;
+          } else if (area.type === 'keep') {
+            mask[p] = 0;
+            protect[p] = 1;
+          } else if (mask[p] === 0) {
+            for (var k = 0; k < ids.length; k++) {
+              if (distance(src, p * 4, colors[ids[k] - 1]) <= maxDist) {
+                mask[p] = ids[k];
+                protect[p] = 0;
+                break;
+              }
+            }
+          }
+        }
+      }
+    }
+    return protect;
+  }
+
+  /*
+   * Full pipeline: tap picks (seeds), then area edits (options.areas), then
+   * render into dst. Returns pixel counts for the status line.
+   */
   function process(src, dst, width, height, seeds, options) {
     var mask = buildMask(src, width, height, seeds, options);
-    render(src, dst, width, height, seeds, mask, options);
+    var colors = seeds.slice(0, MAX_SEEDS).map(function (s) {
+      return colorAt(src, width, s.x, s.y);
+    });
+    var protect = applyAreas(src, width, height, mask, options.areas, colors, options);
+    render(src, dst, width, height, colors, mask, protect, options);
     var removed = 0;
     for (var p = 0; p < mask.length; p++) if (mask[p]) removed++;
     return { removed: removed, total: mask.length };
@@ -221,6 +286,7 @@
     distance: distance,
     toleranceToDistance: toleranceToDistance,
     buildMask: buildMask,
+    applyAreas: applyAreas,
     render: render,
     process: process,
   };

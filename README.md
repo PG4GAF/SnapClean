@@ -7,16 +7,26 @@ canvas + JavaScript: no server, no uploads, no account, no watermark.
 ## How it works
 
 1. Choose (or drag/drop/paste) a PNG or JPG.
-2. Tap the background. All connected pixels within the **tolerance** of that
-   colour become transparent. Tap more spots to remove other regions (e.g.
-   the hole inside an "O"); tap a swatch to drop a pick, or use Undo/Reset.
-3. Adjust **Tolerance** (how different a shade can be and still count as
-   background) and **Edge smoothing** (fades anti-aliased edge pixels and
-   subtracts the background colour from them so no halo is left).
-   Untick **Only connected areas** to remove that colour everywhere.
-4. Preview against a checkerboard, white, black or magenta; hold
-   **Hold to see original** to compare.
-5. **Download PNG** exports at the image's original pixel dimensions.
+2. **Tap tool:** tap the background. All connected pixels within the
+   **tolerance** of that colour become transparent. Tap more spots to remove
+   other regions; tap a swatch to drop a pick.
+3. **Area tool:** drag a box over a small area, then choose:
+   - **Remove colour** – removes the picked background colour(s) inside the
+     box only, even where it isn't connected (e.g. the hole inside an "O").
+     With no picks yet, it uses the colour where the drag started.
+   - **Erase** – makes the whole box transparent (stray specks, shadows).
+   - **Keep** – protects the box, restoring anything removed there.
+4. **Undo / Redo** in the toolbar cover every edit, including slider changes
+   (keyboard: Ctrl/⌘+Z, Ctrl/⌘+Shift+Z or Ctrl+Y). **Start over** clears all
+   edits and can itself be undone.
+5. **Zoom** (−, 100%, +; up to 16×, or Ctrl/⌘+wheel / pinch on trackpads)
+   for precise taps and boxes on small details; pixels render crisp when
+   magnified. Use the Tap tool to scroll around while zoomed.
+6. Adjust **Tolerance**, **Edge smoothing** (fades anti-aliased edges and
+   subtracts the background colour so no halo is left) and **Only connected
+   areas**; preview on checkerboard/white/black/magenta; hold
+   **Hold: original** to compare.
+7. **Download PNG** exports at the image's original pixel dimensions.
 
 ## Android
 

@@ -22,7 +22,13 @@
     contiguous: $('contiguous'),
     swatches: $('swatches'),
     undoBtn: $('undoBtn'),
+    redoBtn: $('redoBtn'),
     resetBtn: $('resetBtn'),
+    zoomInBtn: $('zoomInBtn'),
+    zoomOutBtn: $('zoomOutBtn'),
+    zoomFitBtn: $('zoomFitBtn'),
+    selection: $('selection'),
+    areaBar: $('areaBar'),
     compareBtn: $('compareBtn'),
     downloadBtn: $('downloadBtn'),
     sizeInfo: $('sizeInfo'),
@@ -38,10 +44,19 @@
     height: 0,
     src: null,        // ImageData of the untouched original
     out: null,        // ImageData of the current result
-    seeds: [],        // [{x, y, color}]
+    seeds: [],        // [{x, y, color}] tap picks
+    areas: [],        // [{type, x0, y0, x1, y1, colors?}] box edits
+    history: [],      // snapshots of the edit state, for undo/redo
+    historyIndex: -1,
+    tool: 'tap',      // 'tap' | 'area'
+    zoom: 1,          // multiple of fit-to-screen size
+    drag: null,       // in-progress area selection {x0, y0, x1, y1}
+    selected: null,   // finished selection awaiting an action
     comparing: false,
     pending: false,
   };
+
+  var ZOOM_STEPS = [1, 1.5, 2, 3, 4, 6, 8, 12, 16];
 
   // ---------- Loading ----------
 
@@ -108,12 +123,18 @@
     state.width = w;
     state.height = h;
     state.seeds = [];
+    state.areas = [];
+    state.history = [];
+    state.historyIndex = -1;
+    clearSelection();
+    commit();
 
     els.dropZone.hidden = true;
     els.editor.hidden = false;
     els.newImageBtn.hidden = false;
     document.body.classList.add('is-editing');
     els.sizeInfo.textContent = w + ' × ' + h + ' px · full resolution, no watermark';
+    setZoom(1);
     refreshControls();
     els.status.textContent = '';
     window.scrollTo(0, 0);
@@ -132,6 +153,10 @@
   function resetToStart() {
     state.src = state.out = null;
     state.seeds = [];
+    state.areas = [];
+    state.history = [];
+    state.historyIndex = -1;
+    clearSelection();
     els.canvas.width = els.canvas.height = 0;
     els.markers.innerHTML = '';
     els.editor.hidden = true;
@@ -148,7 +173,71 @@
       tolerance: +els.tolerance.value,
       edgeSoftness: +els.softness.value,
       contiguous: els.contiguous.checked,
+      areas: state.areas,
     };
+  }
+
+  function hasEdits() {
+    return state.seeds.length > 0 || state.areas.length > 0;
+  }
+
+  // ---------- Undo / redo ----------
+  //
+  // Every edit (pick, area, slider, checkbox) is recorded as a snapshot of
+  // the whole edit state. Snapshots are tiny (no pixels), so undo is instant
+  // and simply re-runs processing from the original image.
+
+  var HISTORY_LIMIT = 200;
+
+  function snapshot() {
+    return JSON.stringify({
+      seeds: state.seeds,
+      areas: state.areas,
+      tolerance: els.tolerance.value,
+      softness: els.softness.value,
+      contiguous: els.contiguous.checked,
+    });
+  }
+
+  function commit() {
+    var snap = snapshot();
+    if (state.history[state.historyIndex] === snap) return;
+    state.history.length = state.historyIndex + 1; // drop the redo branch
+    state.history.push(snap);
+    if (state.history.length > HISTORY_LIMIT) state.history.shift();
+    state.historyIndex = state.history.length - 1;
+    refreshHistoryButtons();
+  }
+
+  function restore(snap) {
+    var s = JSON.parse(snap);
+    state.seeds = s.seeds;
+    state.areas = s.areas;
+    els.tolerance.value = s.tolerance;
+    els.toleranceOut.textContent = s.tolerance;
+    els.softness.value = s.softness;
+    els.softnessOut.textContent = s.softness;
+    els.contiguous.checked = s.contiguous;
+    clearSelection();
+    refreshControls();
+    scheduleUpdate();
+  }
+
+  function undo() {
+    if (!state.src || state.historyIndex <= 0) return;
+    state.historyIndex--;
+    restore(state.history[state.historyIndex]);
+  }
+
+  function redo() {
+    if (!state.src || state.historyIndex >= state.history.length - 1) return;
+    state.historyIndex++;
+    restore(state.history[state.historyIndex]);
+  }
+
+  function refreshHistoryButtons() {
+    els.undoBtn.disabled = state.historyIndex <= 0;
+    els.redoBtn.disabled = state.historyIndex >= state.history.length - 1;
   }
 
   // Coalesce rapid slider/tap events into one run, after the browser paints
@@ -169,7 +258,7 @@
     if (!state.src) return;
     var t0 = performance.now();
     var result;
-    if (state.seeds.length) {
+    if (hasEdits()) {
       result = Core.process(state.src.data, state.out.data, state.width, state.height, state.seeds, options());
     } else {
       state.out.data.set(state.src.data);
@@ -177,7 +266,7 @@
     }
     if (!state.comparing) ctx.putImageData(state.out, 0, 0);
     var ms = Math.round(performance.now() - t0);
-    if (state.seeds.length) {
+    if (hasEdits()) {
       var pct = (100 * result.removed / result.total);
       els.status.textContent = 'Removed ' + (pct < 0.1 && pct > 0 ? '<0.1' : pct.toFixed(1)) +
         '% of pixels' + (ms > 150 ? ' · ' + ms + ' ms' : '');
@@ -198,6 +287,119 @@
     };
   }
 
+  // ---------- Tools ----------
+
+  function setTool(tool) {
+    state.tool = tool;
+    document.querySelectorAll('.tool[data-tool]').forEach(function (b) {
+      var on = b.dataset.tool === tool;
+      b.classList.toggle('is-active', on);
+      b.setAttribute('aria-checked', on ? 'true' : 'false');
+    });
+    els.editor.classList.toggle('tool-area', tool === 'area');
+    if (tool !== 'area') clearSelection();
+    refreshHint();
+  }
+
+  function refreshHint() {
+    if (state.tool === 'area') {
+      els.hint.textContent = state.selected
+        ? 'Choose what to do with the selected area.'
+        : 'Drag a box over a small area' + (state.zoom > 1 ? ' (switch to Tap to scroll).' : '. Zoom in for precision.');
+    } else if (hasEdits()) {
+      els.hint.textContent = 'Tap other background areas to remove them too. Use Area for small spots.';
+    } else {
+      els.hint.textContent = 'Tap the background colour you want to remove.';
+    }
+  }
+
+  // ---------- Area selection ----------
+
+  function normRect(r) {
+    return {
+      x0: Math.min(r.x0, r.x1),
+      y0: Math.min(r.y0, r.y1),
+      x1: Math.max(r.x0, r.x1) + 1, // inclusive end pixel -> exclusive bound
+      y1: Math.max(r.y0, r.y1) + 1,
+    };
+  }
+
+  function drawSelection(r) {
+    if (!r) { els.selection.hidden = true; return; }
+    var n = normRect(r);
+    els.selection.hidden = false;
+    els.selection.style.left = (n.x0 / state.width * 100) + '%';
+    els.selection.style.top = (n.y0 / state.height * 100) + '%';
+    els.selection.style.width = ((n.x1 - n.x0) / state.width * 100) + '%';
+    els.selection.style.height = ((n.y1 - n.y0) / state.height * 100) + '%';
+  }
+
+  function clearSelection() {
+    state.drag = state.selected = null;
+    els.selection.hidden = true;
+    els.areaBar.hidden = true;
+    if (state.src) refreshHint();
+  }
+
+  function applyArea(type) {
+    var sel = state.selected;
+    if (!sel) return;
+    var area = normRect(sel);
+    area.type = type;
+    if (type === 'remove') {
+      // Remove the picked background colours inside the box; with no picks
+      // yet, use the colour where the drag started (usually background).
+      area.colors = state.seeds.length
+        ? state.seeds.map(function (s) { return s.color; })
+        : [Core.colorAt(state.src.data, state.width, sel.x0, sel.y0)];
+    }
+    state.areas.push(area);
+    clearSelection();
+    commit();
+    refreshControls();
+    scheduleUpdate();
+  }
+
+  // ---------- Zoom ----------
+
+  // Size the canvas element to fit the stage, times the zoom level. The
+  // canvas keeps its full-resolution pixels; only its displayed size changes.
+  function layout() {
+    if (!state.src) return;
+    var cs = getComputedStyle(els.stage);
+    var padX = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
+    var padY = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
+    var availW = Math.max(50, els.stage.clientWidth - padX);
+    var availH = Math.max(50, parseFloat(cs.maxHeight) - padY - 2);
+    var fit = Math.min(availW / state.width, availH / state.height);
+    var scale = fit * state.zoom;
+    els.canvas.style.width = Math.round(state.width * scale) + 'px';
+    els.canvas.style.height = Math.round(state.height * scale) + 'px';
+    // Show crisp pixels when magnified, for precise picking.
+    els.canvas.classList.toggle('is-pixelated', scale >= 2);
+  }
+
+  function setZoom(z) {
+    var stage = els.stage;
+    // Keep the point at the centre of the view in place while zooming.
+    var cx = (stage.scrollLeft + stage.clientWidth / 2) / (stage.scrollWidth || 1);
+    var cy = (stage.scrollTop + stage.clientHeight / 2) / (stage.scrollHeight || 1);
+    state.zoom = z;
+    layout();
+    stage.scrollLeft = cx * stage.scrollWidth - stage.clientWidth / 2;
+    stage.scrollTop = cy * stage.scrollHeight - stage.clientHeight / 2;
+    els.zoomFitBtn.textContent = Math.round(z * 100) + '%';
+    els.zoomOutBtn.disabled = z <= ZOOM_STEPS[0];
+    els.zoomInBtn.disabled = z >= ZOOM_STEPS[ZOOM_STEPS.length - 1];
+    refreshHint();
+  }
+
+  function zoomBy(dir) {
+    var i = ZOOM_STEPS.indexOf(state.zoom);
+    var next = ZOOM_STEPS[Math.max(0, Math.min(ZOOM_STEPS.length - 1, i + dir))];
+    if (next !== state.zoom) setZoom(next);
+  }
+
   function addSeed(x, y) {
     if (state.seeds.length >= Core.MAX_SEEDS) {
       els.status.textContent = 'Maximum number of picks reached.';
@@ -205,12 +407,14 @@
     }
     var color = Core.colorAt(state.src.data, state.width, x, y);
     state.seeds.push({ x: x, y: y, color: color });
+    commit();
     refreshControls();
     scheduleUpdate();
   }
 
   function removeSeed(index) {
     state.seeds.splice(index, 1);
+    commit();
     refreshControls();
     scheduleUpdate();
   }
@@ -224,18 +428,16 @@
   }
 
   function refreshControls() {
-    var has = state.seeds.length > 0;
-    els.undoBtn.disabled = !has;
-    els.resetBtn.disabled = !has;
-    els.downloadBtn.disabled = !has;
-    els.shareBtn.disabled = !has;
-    els.hint.textContent = has
-      ? 'Tap other background areas to remove them too. Raise tolerance if edges remain.'
-      : 'Tap the background colour you want to remove.';
+    var edited = hasEdits();
+    els.resetBtn.disabled = !edited;
+    els.downloadBtn.disabled = !edited;
+    els.shareBtn.disabled = !edited;
+    refreshHistoryButtons();
+    refreshHint();
 
     els.markers.innerHTML = '';
     els.swatches.innerHTML = '';
-    if (!has) {
+    if (!state.seeds.length) {
       els.swatches.innerHTML = '<span class="muted">None yet</span>';
       return;
     }
@@ -366,11 +568,70 @@
   });
 
   els.canvas.addEventListener('click', function (e) {
-    if (!state.src || state.comparing) return;
+    if (!state.src || state.comparing || state.tool !== 'tap') return;
     var p = eventToPixel(e);
     addSeed(p.x, p.y);
   });
 
+  // Area tool: drag a box (mouse, pen or finger).
+  els.canvas.addEventListener('pointerdown', function (e) {
+    if (!state.src || state.comparing || state.tool !== 'area' || e.button > 0) return;
+    e.preventDefault();
+    els.canvas.setPointerCapture(e.pointerId);
+    var p = eventToPixel(e);
+    state.selected = null;
+    els.areaBar.hidden = true;
+    state.drag = { x0: p.x, y0: p.y, x1: p.x, y1: p.y };
+    drawSelection(state.drag);
+  });
+  els.canvas.addEventListener('pointermove', function (e) {
+    if (!state.drag) return;
+    var p = eventToPixel(e);
+    state.drag.x1 = p.x;
+    state.drag.y1 = p.y;
+    drawSelection(state.drag);
+  });
+  function endDrag() {
+    var d = state.drag;
+    if (!d) return;
+    state.drag = null;
+    // Ignore accidental taps: require a box at least ~6 screen px across.
+    var rect = els.canvas.getBoundingClientRect();
+    var pxPerImg = rect.width / state.width;
+    if (Math.abs(d.x1 - d.x0) * pxPerImg < 6 && Math.abs(d.y1 - d.y0) * pxPerImg < 6) {
+      clearSelection();
+      return;
+    }
+    state.selected = d;
+    els.areaBar.hidden = false;
+    refreshHint();
+  }
+  els.canvas.addEventListener('pointerup', endDrag);
+  els.canvas.addEventListener('pointercancel', function () { clearSelection(); });
+
+  els.areaBar.addEventListener('click', function (e) {
+    var btn = e.target.closest('[data-area]');
+    if (!btn) return;
+    if (btn.dataset.area === 'cancel') clearSelection();
+    else applyArea(btn.dataset.area);
+  });
+
+  document.querySelectorAll('.tool[data-tool]').forEach(function (b) {
+    b.addEventListener('click', function () { setTool(b.dataset.tool); });
+  });
+
+  els.zoomInBtn.addEventListener('click', function () { zoomBy(1); });
+  els.zoomOutBtn.addEventListener('click', function () { zoomBy(-1); });
+  els.zoomFitBtn.addEventListener('click', function () { setZoom(1); });
+  window.addEventListener('resize', layout);
+  // Ctrl/⌘ + mouse wheel (and trackpad pinch) zooms the image.
+  els.stage.addEventListener('wheel', function (e) {
+    if (!e.ctrlKey && !e.metaKey) return;
+    e.preventDefault();
+    zoomBy(e.deltaY < 0 ? 1 : -1);
+  }, { passive: false });
+
+  // Sliders update the preview live and record one history step on release.
   els.tolerance.addEventListener('input', function () {
     els.toleranceOut.textContent = els.tolerance.value;
     scheduleUpdate();
@@ -379,15 +640,37 @@
     els.softnessOut.textContent = els.softness.value;
     scheduleUpdate();
   });
-  els.contiguous.addEventListener('change', scheduleUpdate);
-
-  els.undoBtn.addEventListener('click', function () {
-    if (state.seeds.length) removeSeed(state.seeds.length - 1);
+  els.tolerance.addEventListener('change', commit);
+  els.softness.addEventListener('change', commit);
+  els.contiguous.addEventListener('change', function () {
+    commit();
+    scheduleUpdate();
   });
+
+  els.undoBtn.addEventListener('click', undo);
+  els.redoBtn.addEventListener('click', redo);
   els.resetBtn.addEventListener('click', function () {
     state.seeds = [];
+    state.areas = [];
+    clearSelection();
+    commit(); // undoable
     refreshControls();
     scheduleUpdate();
+  });
+
+  // Keyboard: Ctrl/⌘+Z undo, Ctrl/⌘+Shift+Z or Ctrl+Y redo, +/−/0 zoom,
+  // Esc cancels a selection.
+  document.addEventListener('keydown', function (e) {
+    if (!state.src || els.editor.hidden) return;
+    var mod = e.ctrlKey || e.metaKey;
+    var k = e.key.toLowerCase();
+    if (mod && k === 'z') { e.preventDefault(); if (e.shiftKey) redo(); else undo(); }
+    else if (mod && k === 'y') { e.preventDefault(); redo(); }
+    else if (mod) return;
+    else if (k === 'escape') clearSelection();
+    else if (k === '+' || k === '=') zoomBy(1);
+    else if (k === '-') zoomBy(-1);
+    else if (k === '0') setZoom(1);
   });
 
   // Press-and-hold compare (mouse, touch and keyboard).

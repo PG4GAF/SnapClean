@@ -39,12 +39,53 @@
     <!-- Step 2: edit -->
     <section id="editor" class="editor" hidden>
       <div class="stage-wrap">
+        <div class="toolbar" role="toolbar" aria-label="Editing tools">
+          <div class="tool-group" role="radiogroup" aria-label="Tool">
+            <button type="button" class="tool is-active" data-tool="tap" role="radio" aria-checked="true" aria-label="Tap tool" title="Tap a colour to remove it">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 11V5.5a1.5 1.5 0 013 0V10m0-1.5a1.5 1.5 0 013 0V11m0-1a1.5 1.5 0 013 0v4.5A6.5 6.5 0 0111.5 21h-.6a6 6 0 01-4.6-2.2L3.5 15.4a1.5 1.5 0 012.2-2L9 16V11"/></svg>
+              <span>Tap</span>
+            </button>
+            <button type="button" class="tool" data-tool="area" role="radio" aria-checked="false" aria-label="Area tool" title="Drag a box over a small area">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8V5a1 1 0 011-1h3M16 4h3a1 1 0 011 1v3M20 16v3a1 1 0 01-1 1h-3M8 20H5a1 1 0 01-1-1v-3" /></svg>
+              <span>Area</span>
+            </button>
+          </div>
+          <div class="tool-group">
+            <button id="undoBtn" type="button" class="tool" disabled aria-label="Undo" title="Undo (Ctrl+Z)">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14L4 9l5-5M4 9h10.5a5.5 5.5 0 010 11H11"/></svg>
+              <span>Undo</span>
+            </button>
+            <button id="redoBtn" type="button" class="tool" disabled aria-label="Redo" title="Redo (Ctrl+Y)">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 14l5-5-5-5M20 9H9.5a5.5 5.5 0 000 11H13"/></svg>
+              <span>Redo</span>
+            </button>
+          </div>
+          <div class="tool-group">
+            <button id="zoomOutBtn" type="button" class="tool tool-icon" aria-label="Zoom out" title="Zoom out (−)">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg>
+            </button>
+            <button id="zoomFitBtn" type="button" class="tool tool-zoom" aria-label="Fit to screen" title="Fit to screen (0)">100%</button>
+            <button id="zoomInBtn" type="button" class="tool tool-icon" aria-label="Zoom in" title="Zoom in (+)">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+            </button>
+          </div>
+        </div>
+
         <p id="hint" class="hint">Tap the background colour you want to remove.</p>
         <div id="stage" class="stage bg-checker">
           <div id="canvasBox" class="canvas-box">
             <canvas id="canvas" aria-label="Image preview. Tap to pick the background colour."></canvas>
             <div id="markers" class="markers" aria-hidden="true"></div>
+            <div id="selection" class="selection" hidden></div>
           </div>
+        </div>
+
+        <div id="areaBar" class="area-bar" hidden>
+          <span class="area-bar-label">Selected area:</span>
+          <button type="button" class="btn btn-sm btn-primary" data-area="remove" title="Remove the background colour inside the box only">Remove colour</button>
+          <button type="button" class="btn btn-sm" data-area="erase" title="Make the whole box transparent">Erase</button>
+          <button type="button" class="btn btn-sm" data-area="keep" title="Keep everything inside the box">Keep</button>
+          <button type="button" class="btn btn-sm btn-ghost" data-area="cancel">Cancel</button>
         </div>
         <p id="status" class="status" aria-live="polite"></p>
       </div>
@@ -90,10 +131,9 @@
         </div>
 
         <div class="row">
-          <button id="undoBtn" class="btn" type="button" disabled>Undo pick</button>
-          <button id="resetBtn" class="btn" type="button" disabled>Reset</button>
+          <button id="compareBtn" class="btn" type="button">Hold: original</button>
+          <button id="resetBtn" class="btn" type="button" disabled>Start over</button>
         </div>
-        <button id="compareBtn" class="btn btn-block" type="button">Hold to see original</button>
 
         <div class="export">
           <div class="export-buttons">

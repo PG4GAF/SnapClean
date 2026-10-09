@@ -7,9 +7,15 @@ canvas + JavaScript: no server, no uploads, no account, no watermark.
 ## How it works
 
 1. Choose (or drag/drop/paste) a PNG or JPG.
-2. **Tap tool:** tap the background. All connected pixels within the
-   **tolerance** of that colour become transparent. Tap more spots to remove
-   other regions; tap a swatch to drop a pick.
+2. **Tap tool:** tap the background. Choose what each tap removes with the
+   **Tap removes** toggle:
+   - **Connected area** – the region touching the tap (within **tolerance**).
+   - **All matching** – every pixel of that colour in the whole image,
+     including small isolated pockets (inside text, tight gaps).
+   The mode is saved per tap, so both can be mixed. Dashed swatches are
+   "All matching" picks; tap a swatch to drop that pick. Pick markers are
+   thin outlines; when zoomed in they shrink to a box around the exact pixel
+   so they never cover what you're targeting.
 3. **Area tool:** drag a box over a small area, then choose:
    - **Remove colour** – removes the picked background colour(s) inside the
      box only, even where it isn't connected (e.g. the hole inside an "O").
@@ -22,9 +28,8 @@ canvas + JavaScript: no server, no uploads, no account, no watermark.
 5. **Zoom** (−, 100%, +; up to 16×, or Ctrl/⌘+wheel / pinch on trackpads)
    for precise taps and boxes on small details; pixels render crisp when
    magnified. Use the Tap tool to scroll around while zoomed.
-6. Adjust **Tolerance**, **Edge smoothing** (fades anti-aliased edges and
-   subtracts the background colour so no halo is left) and **Only connected
-   areas**; preview on checkerboard/white/black/magenta; hold
+6. Adjust **Tolerance** and **Edge smoothing** (fades anti-aliased edges and
+   subtracts the background colour so no halo is left); preview on checkerboard/white/black/magenta; hold
    **Hold: original** to compare.
 7. **Download PNG** exports at the image's original pixel dimensions.
 

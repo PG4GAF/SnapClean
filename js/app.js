@@ -19,7 +19,6 @@
     toleranceOut: $('toleranceOut'),
     softness: $('softness'),
     softnessOut: $('softnessOut'),
-    contiguous: $('contiguous'),
     swatches: $('swatches'),
     undoBtn: $('undoBtn'),
     redoBtn: $('redoBtn'),
@@ -44,7 +43,8 @@
     height: 0,
     src: null,        // ImageData of the untouched original
     out: null,        // ImageData of the current result
-    seeds: [],        // [{x, y, color}] tap picks
+    seeds: [],        // [{x, y, color, scope}] tap picks
+    pickScope: 'connected', // what the next tap clears: 'connected' | 'all'
     areas: [],        // [{type, x0, y0, x1, y1, colors?}] box edits
     history: [],      // snapshots of the edit state, for undo/redo
     historyIndex: -1,
@@ -172,7 +172,6 @@
     return {
       tolerance: +els.tolerance.value,
       edgeSoftness: +els.softness.value,
-      contiguous: els.contiguous.checked,
       areas: state.areas,
     };
   }
@@ -195,7 +194,6 @@
       areas: state.areas,
       tolerance: els.tolerance.value,
       softness: els.softness.value,
-      contiguous: els.contiguous.checked,
     });
   }
 
@@ -217,7 +215,6 @@
     els.toleranceOut.textContent = s.tolerance;
     els.softness.value = s.softness;
     els.softnessOut.textContent = s.softness;
-    els.contiguous.checked = s.contiguous;
     clearSelection();
     refreshControls();
     scheduleUpdate();
@@ -297,6 +294,9 @@
       b.setAttribute('aria-checked', on ? 'true' : 'false');
     });
     els.editor.classList.toggle('tool-area', tool === 'area');
+    els.canvas.setAttribute('aria-label', tool === 'area'
+      ? 'Image preview. Drag to select an area.'
+      : 'Image preview. Tap to pick the background colour.');
     if (tool !== 'area') clearSelection();
     refreshHint();
   }
@@ -306,11 +306,23 @@
       els.hint.textContent = state.selected
         ? 'Choose what to do with the selected area.'
         : 'Drag a box over a small area' + (state.zoom > 1 ? ' (switch to Tap to scroll).' : '. Zoom in for precision.');
+    } else if (state.pickScope === 'all') {
+      els.hint.textContent = 'Tap a colour to clear every matching pixel in the image, including small pockets.';
     } else if (hasEdits()) {
-      els.hint.textContent = 'Tap other background areas to remove them too. Use Area for small spots.';
+      els.hint.textContent = 'Tap other background areas to remove them too. Leftover specks? Switch to "All matching".';
     } else {
       els.hint.textContent = 'Tap the background colour you want to remove.';
     }
+  }
+
+  function setPickScope(scope) {
+    state.pickScope = scope;
+    document.querySelectorAll('.seg[data-scope]').forEach(function (b) {
+      var on = b.dataset.scope === scope;
+      b.classList.toggle('is-active', on);
+      b.setAttribute('aria-checked', on ? 'true' : 'false');
+    });
+    refreshHint();
   }
 
   // ---------- Area selection ----------
@@ -377,6 +389,10 @@
     els.canvas.style.height = Math.round(state.height * scale) + 'px';
     // Show crisp pixels when magnified, for precise picking.
     els.canvas.classList.toggle('is-pixelated', scale >= 2);
+    // Markers shrink to a thin box around the exact pixel once a pixel is
+    // big enough on screen to see, so they never hide what's being targeted.
+    els.markers.style.setProperty('--px', scale + 'px');
+    els.markers.classList.toggle('is-pixel', scale >= 4);
   }
 
   function setZoom(z) {
@@ -406,7 +422,7 @@
       return;
     }
     var color = Core.colorAt(state.src.data, state.width, x, y);
-    state.seeds.push({ x: x, y: y, color: color });
+    state.seeds.push({ x: x, y: y, color: color, scope: state.pickScope });
     commit();
     refreshControls();
     scheduleUpdate();
@@ -443,18 +459,18 @@
     }
     state.seeds.forEach(function (s, i) {
       var m = document.createElement('div');
-      m.className = 'marker';
+      m.className = 'marker' + (s.scope === 'all' ? ' is-all' : '');
       m.style.left = ((s.x + 0.5) / state.width * 100) + '%';
       m.style.top = ((s.y + 0.5) / state.height * 100) + '%';
-      m.style.background = rgbCss(s.color);
       els.markers.appendChild(m);
 
       var b = document.createElement('button');
       b.type = 'button';
-      b.className = 'swatch';
+      var scopeText = s.scope === 'all' ? 'all matching' : 'connected area';
+      b.className = 'swatch' + (s.scope === 'all' ? ' is-all' : '');
       b.style.background = rgbCss(s.color);
-      b.title = hex(s.color) + ' – tap to remove this pick';
-      b.setAttribute('aria-label', 'Remove picked colour ' + hex(s.color));
+      b.title = hex(s.color) + ' (' + scopeText + ') – tap to remove this pick';
+      b.setAttribute('aria-label', 'Remove picked colour ' + hex(s.color) + ', ' + scopeText);
       b.addEventListener('click', function () { removeSeed(i); });
       els.swatches.appendChild(b);
     });
@@ -642,9 +658,8 @@
   });
   els.tolerance.addEventListener('change', commit);
   els.softness.addEventListener('change', commit);
-  els.contiguous.addEventListener('change', function () {
-    commit();
-    scheduleUpdate();
+  document.querySelectorAll('.seg[data-scope]').forEach(function (b) {
+    b.addEventListener('click', function () { setPickScope(b.dataset.scope); });
   });
 
   els.undoBtn.addEventListener('click', undo);

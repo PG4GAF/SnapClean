@@ -49,7 +49,11 @@
    * Build a mask of pixels to remove.
    *
    * src      Uint8ClampedArray RGBA, length width*height*4
-   * seeds    [{x, y}] picked pixel coordinates (image space)
+   * seeds    [{x, y, scope?}] picked pixel coordinates (image space).
+   *          scope 'connected' clears the region touching the pick;
+   *          scope 'all' clears every matching pixel in the image, including
+   *          small disconnected pockets. Without scope, options.contiguous
+   *          decides (default connected).
    * options  {tolerance: 0..100, contiguous: bool}
    *
    * Returns Uint8Array of length width*height where 0 = keep and
@@ -59,8 +63,8 @@
     var n = width * height;
     var mask = new Uint8Array(n);
     var maxDist = toleranceToDistance(options.tolerance);
-    var contiguous = options.contiguous !== false;
-    var stack = contiguous ? scratchStack(n) : null;
+    var defaultContiguous = options.contiguous !== false;
+    var stack = null;
 
     for (var s = 0; s < seeds.length && s < MAX_SEEDS; s++) {
       var sx = seeds[s].x;
@@ -68,6 +72,7 @@
       if (sx < 0 || sy < 0 || sx >= width || sy >= height) continue;
       var id = s + 1;
       var color = colorAt(src, width, sx, sy);
+      var contiguous = seeds[s].scope ? seeds[s].scope !== 'all' : defaultContiguous;
 
       if (!contiguous) {
         for (var p = 0; p < n; p++) {
@@ -78,6 +83,7 @@
 
       var start = sy * width + sx;
       if (mask[start] !== 0) continue; // already removed by an earlier pick
+      if (!stack) stack = scratchStack(n);
       // Scanline flood fill (4-connected), iterative to avoid deep recursion.
       var sp = 0;
       stack[sp++] = start;

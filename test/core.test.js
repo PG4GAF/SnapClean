@@ -137,3 +137,24 @@ test('area boxes are clipped to the image and order-independent of drag directio
   assert.strictEqual(alphaAt(dst, w, 3, 3), 0);
   assert.strictEqual(alphaAt(dst, w, 1, 1), 255);
 });
+
+test('per-pick scope: "all" clears isolated pockets, "connected" does not', () => {
+  // White bg; black block with a 1px white pocket inside it at (5,5); and a
+  // grey bg region on the right with its own isolated grey pocket.
+  const w = 12, h = 10;
+  const src = makeImage(w, h, [255, 255, 255, 255], [0, 0, 0, 255], { x0: 3, x1: 8, y0: 3, y1: 8 });
+  src.set([255, 255, 255, 255], (5 * w + 5) * 4);
+  const dst = new Uint8ClampedArray(src.length);
+  const opts = { tolerance: 5, edgeSoftness: 0 };
+
+  Core.process(src, dst, w, h, [{ x: 0, y: 0, scope: 'connected' }], opts);
+  assert.strictEqual(alphaAt(dst, w, 5, 5), 255, 'connected pick leaves the enclosed pocket');
+
+  Core.process(src, dst, w, h, [{ x: 0, y: 0, scope: 'all' }], opts);
+  assert.strictEqual(alphaAt(dst, w, 5, 5), 0, 'all-matching pick clears the pocket');
+  assert.strictEqual(alphaAt(dst, w, 4, 4), 255, 'subject kept');
+
+  // Scope is per pick and overrides the global option.
+  Core.process(src, dst, w, h, [{ x: 0, y: 0, scope: 'connected' }], { ...opts, contiguous: false });
+  assert.strictEqual(alphaAt(dst, w, 5, 5), 255);
+});

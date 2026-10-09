@@ -241,14 +241,53 @@ main {
   outline-offset: 1px;
 }
 
-/* Area selection */
+/* Area selection: outline only, so the pixels inside stay visible. */
 .selection {
   position: absolute;
-  border: 2px dashed var(--primary);
-  background: color-mix(in srgb, var(--primary) 18%, transparent);
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.8);
+  border: 1px dashed #000;
+  outline: 1px dashed #fff;
+  outline-offset: -2px;
   pointer-events: none;
 }
+
+/* Tap mode toggle */
+.pick-mode {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.pick-mode-label { font-weight: 600; font-size: 0.9rem; }
+.segmented {
+  display: inline-flex;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 3px;
+  gap: 2px;
+}
+.seg {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  font-size: 0.88rem;
+  min-height: 36px;
+  padding: 6px 12px;
+  border-radius: 7px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.seg:hover:not(.is-active) { background: color-mix(in srgb, var(--text) 7%, transparent); }
+.seg.is-active { background: var(--primary); color: var(--primary-text); }
+.seg:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--primary) 50%, transparent);
+  outline-offset: 1px;
+}
+.tool-area .pick-mode { display: none; }
 .area-bar {
   display: flex;
   flex-wrap: wrap;
@@ -264,15 +303,50 @@ main {
 .btn-sm { min-height: 38px; padding: 6px 10px; font-size: 0.9rem; }
 
 .markers { position: absolute; inset: 0; pointer-events: none; }
+/*
+ * Pick markers are outline-only so the picked pixels stay visible: a thin
+ * hollow ring with crosshair ticks outside it. When zoomed in far enough
+ * that one image pixel is large on screen (--px set from JS), the marker
+ * becomes a thin box exactly around the picked pixel.
+ */
 .marker {
   position: absolute;
-  width: 18px;
-  height: 18px;
-  margin: -9px 0 0 -9px;
+  width: 16px;
+  height: 16px;
+  margin: -8px 0 0 -8px;
   border-radius: 50%;
-  border: 2px solid #fff;
-  box-shadow: 0 0 0 1.5px #000, 0 1px 4px rgba(0, 0, 0, 0.4);
+  border: 1px solid #fff;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.8), inset 0 0 0 1px rgba(0, 0, 0, 0.8);
 }
+.marker::before,
+.marker::after {
+  content: "";
+  position: absolute;
+  background: #fff;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.8);
+}
+/* Crosshair ticks sit outside the ring, never over the centre pixel. */
+.marker::before { left: 50%; top: -7px; width: 1px; height: 28px; margin-left: -0.5px;
+  -webkit-mask: linear-gradient(#000 0 5px, transparent 5px 23px, #000 23px);
+  mask: linear-gradient(#000 0 5px, transparent 5px 23px, #000 23px); }
+.marker::after { top: 50%; left: -7px; height: 1px; width: 28px; margin-top: -0.5px;
+  -webkit-mask: linear-gradient(90deg, #000 0 5px, transparent 5px 23px, #000 23px);
+  mask: linear-gradient(90deg, #000 0 5px, transparent 5px 23px, #000 23px); }
+.marker.is-all { border-style: dashed; }
+.markers.is-pixel .marker {
+  width: var(--px);
+  height: var(--px);
+  margin: calc(var(--px) / -2) 0 0 calc(var(--px) / -2);
+  border-radius: 0;
+}
+.markers.is-pixel .marker {
+  /* Draw the box just outside the pixel so none of it is covered. */
+  border: 0;
+  box-shadow: 0 0 0 1px #fff, 0 0 0 2px rgba(0, 0, 0, 0.8);
+}
+.markers.is-pixel .marker::before,
+.markers.is-pixel .marker::after { display: none; }
+.swatch.is-all { outline: 2px dashed var(--primary); outline-offset: 1px; }
 
 .status { color: var(--muted); font-size: 0.9rem; min-height: 1.4em; margin: 8px 0 0; }
 

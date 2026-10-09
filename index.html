@@ -71,6 +71,14 @@
           </div>
         </div>
 
+        <div id="pickMode" class="pick-mode">
+          <span id="pickModeLabel" class="pick-mode-label">Tap removes:</span>
+          <div class="segmented" role="radiogroup" aria-labelledby="pickModeLabel">
+            <button type="button" class="seg is-active" data-scope="connected" role="radio" aria-checked="true" title="Clear only the area connected to where you tap">Connected area</button>
+            <button type="button" class="seg" data-scope="all" role="radio" aria-checked="false" title="Clear every pixel of that colour in the whole image, including small isolated pockets">All matching</button>
+          </div>
+        </div>
+
         <p id="hint" class="hint">Tap the background colour you want to remove.</p>
         <div id="stage" class="stage bg-checker">
           <div id="canvasBox" class="canvas-box">
@@ -109,15 +117,10 @@
           <p class="field-help">Fades anti-aliased edges and removes colour fringes.</p>
         </div>
 
-        <label class="check">
-          <input id="contiguous" type="checkbox" checked>
-          <span>Only connected areas</span>
-        </label>
-        <p class="field-help">Turn off to also remove matching colour enclosed by the subject (e.g. inside letters).</p>
-
         <div class="field">
           <span class="field-label">Picked colours</span>
           <div id="swatches" class="swatches"><span class="muted">None yet</span></div>
+          <p class="field-help">Dashed = "All matching" pick. Tap a swatch to remove that pick.</p>
         </div>
 
         <div class="field">

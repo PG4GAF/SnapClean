@@ -27,6 +27,10 @@
     zoomOutBtn: $('zoomOutBtn'),
     zoomFitBtn: $('zoomFitBtn'),
     selection: $('selection'),
+    brushRow: $('brushRow'),
+    brushSize: $('brushSize'),
+    brushSizeOut: $('brushSizeOut'),
+    brushCursor: $('brushCursor'),
     areaBar: $('areaBar'),
     compareBtn: $('compareBtn'),
     downloadBtn: $('downloadBtn'),
@@ -48,7 +52,8 @@
     areas: [],        // [{type, x0, y0, x1, y1, colors?}] box edits
     history: [],      // snapshots of the edit state, for undo/redo
     historyIndex: -1,
-    tool: 'tap',      // 'tap' | 'area'
+    tool: 'tap',      // 'tap' | 'area' | 'erase'
+    stroke: null,     // eraser stroke in progress {type: 'brush', size, points}
     zoom: 1,          // multiple of fit-to-screen size
     drag: null,       // in-progress area selection {x0, y0, x1, y1}
     selected: null,   // finished selection awaiting an action
@@ -294,15 +299,22 @@
       b.setAttribute('aria-checked', on ? 'true' : 'false');
     });
     els.editor.classList.toggle('tool-area', tool === 'area');
+    els.editor.classList.toggle('tool-erase', tool === 'erase');
     els.canvas.setAttribute('aria-label', tool === 'area'
       ? 'Image preview. Drag to select an area.'
-      : 'Image preview. Tap to pick the background colour.');
+      : tool === 'erase'
+        ? 'Image preview. Hold and drag to erase.'
+        : 'Image preview. Tap to pick the background colour.');
     if (tool !== 'area') clearSelection();
+    if (tool !== 'erase') els.brushCursor.hidden = true;
     refreshHint();
   }
 
   function refreshHint() {
-    if (state.tool === 'area') {
+    if (state.tool === 'erase') {
+      els.hint.textContent = 'Hold the mouse button (or your finger) and drag to erase' +
+        (state.zoom > 1 ? '. Switch to Tap to scroll.' : '. Zoom in for single-pixel detail.');
+    } else if (state.tool === 'area') {
       els.hint.textContent = state.selected
         ? 'Choose what to do with the selected area.'
         : 'Drag a box over a small area' + (state.zoom > 1 ? ' (switch to Tap to scroll).' : '. Zoom in for precision.');
@@ -367,6 +379,69 @@
     }
     state.areas.push(area);
     clearSelection();
+    commit();
+    refreshControls();
+    scheduleUpdate();
+  }
+
+  // ---------- Eraser ----------
+  //
+  // While the button is held, each dab is cleared straight on the canvas for
+  // instant feedback; on release the stroke is stored as one edit (undoable)
+  // and the image is re-processed so edge smoothing etc. stay consistent.
+
+  function brushSize() {
+    return +els.brushSize.value;
+  }
+
+  function setBrushSize(n) {
+    n = Math.max(1, Math.min(50, n | 0));
+    els.brushSize.value = n;
+    els.brushSizeOut.textContent = n + ' × ' + n + ' px';
+    els.brushSizeOut.title = (n * n) + ' pixels';
+  }
+
+  function showBrushCursor(x, y) {
+    var size = brushSize();
+    var o = Core.brushOrigin(x, y, size);
+    var c = els.brushCursor;
+    c.hidden = false;
+    c.style.left = (o[0] / state.width * 100) + '%';
+    c.style.top = (o[1] / state.height * 100) + '%';
+    c.style.width = (size / state.width * 100) + '%';
+    c.style.height = (size / state.height * 100) + '%';
+  }
+
+  function dab(x, y) {
+    var size = state.stroke.size;
+    var o = Core.brushOrigin(x, y, size);
+    state.stroke.points.push([x, y]);
+    if (!state.comparing) ctx.clearRect(o[0], o[1], size, size);
+  }
+
+  function startStroke(p) {
+    state.stroke = { type: 'brush', size: brushSize(), points: [] };
+    dab(p.x, p.y);
+  }
+
+  // Fill the gap between pointer events so fast drags leave no holes.
+  function continueStroke(p) {
+    var pts = state.stroke.points;
+    var last = pts[pts.length - 1];
+    var dx = p.x - last[0], dy = p.y - last[1];
+    var dist = Math.max(Math.abs(dx), Math.abs(dy));
+    if (dist === 0) return;
+    var step = Math.max(1, Math.floor(state.stroke.size / 2));
+    var n = Math.ceil(dist / step);
+    for (var i = 1; i <= n; i++) {
+      dab(Math.round(last[0] + dx * i / n), Math.round(last[1] + dy * i / n));
+    }
+  }
+
+  function endStroke() {
+    if (!state.stroke) return;
+    state.areas.push(state.stroke);
+    state.stroke = null;
     commit();
     refreshControls();
     scheduleUpdate();
@@ -583,6 +658,28 @@
     }
   });
 
+  // Eraser tool: press and hold, then drag.
+  els.canvas.addEventListener('pointerdown', function (e) {
+    if (!state.src || state.comparing || state.tool !== 'erase' || e.button > 0) return;
+    e.preventDefault();
+    els.canvas.setPointerCapture(e.pointerId);
+    var p = eventToPixel(e);
+    showBrushCursor(p.x, p.y);
+    startStroke(p);
+  });
+  els.canvas.addEventListener('pointermove', function (e) {
+    if (!state.src || state.tool !== 'erase') return;
+    var p = eventToPixel(e);
+    showBrushCursor(p.x, p.y);
+    if (state.stroke) continueStroke(p);
+  });
+  els.canvas.addEventListener('pointerup', endStroke);
+  els.canvas.addEventListener('pointercancel', endStroke);
+  els.canvas.addEventListener('pointerleave', function () {
+    if (!state.stroke) els.brushCursor.hidden = true;
+  });
+  els.brushSize.addEventListener('input', function () { setBrushSize(els.brushSize.value); });
+
   els.canvas.addEventListener('click', function (e) {
     if (!state.src || state.comparing || state.tool !== 'tap') return;
     var p = eventToPixel(e);
@@ -686,6 +783,8 @@
     else if (k === '+' || k === '=') zoomBy(1);
     else if (k === '-') zoomBy(-1);
     else if (k === '0') setZoom(1);
+    else if (k === '[') setBrushSize(brushSize() - 1);
+    else if (k === ']') setBrushSize(brushSize() + 1);
   });
 
   // Press-and-hold compare (mouse, touch and keyboard).

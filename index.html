@@ -49,6 +49,10 @@
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8V5a1 1 0 011-1h3M16 4h3a1 1 0 011 1v3M20 16v3a1 1 0 01-1 1h-3M8 20H5a1 1 0 01-1-1v-3" /></svg>
               <span>Area</span>
             </button>
+            <button type="button" class="tool" data-tool="erase" role="radio" aria-checked="false" aria-label="Eraser tool" title="Hold and drag to erase">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 20h13M4.6 13.4l8.8-8.8a2 2 0 012.8 0l3.2 3.2a2 2 0 010 2.8L11 19.1a3 3 0 01-2.1.9H8.2a3 3 0 01-2.1-.9l-1.5-1.5a2 2 0 010-2.8zM9 9l6 6"/></svg>
+              <span>Erase</span>
+            </button>
           </div>
           <div class="tool-group">
             <button id="undoBtn" type="button" class="tool" disabled aria-label="Undo" title="Undo (Ctrl+Z)">
@@ -79,12 +83,19 @@
           </div>
         </div>
 
+        <div id="brushRow" class="brush-row">
+          <label for="brushSize" class="pick-mode-label">Eraser size</label>
+          <input id="brushSize" type="range" min="1" max="50" value="5" step="1">
+          <output id="brushSizeOut" for="brushSize" class="brush-size-out">5 × 5 px</output>
+        </div>
+
         <p id="hint" class="hint">Tap the background colour you want to remove.</p>
         <div id="stage" class="stage bg-checker">
           <div id="canvasBox" class="canvas-box">
             <canvas id="canvas" aria-label="Image preview. Tap to pick the background colour."></canvas>
             <div id="markers" class="markers" aria-hidden="true"></div>
             <div id="selection" class="selection" hidden></div>
+            <div id="brushCursor" class="brush-cursor" hidden></div>
           </div>
         </div>
 

@@ -222,11 +222,14 @@
   /*
    * Apply rectangular area edits, in order, on top of the tap-based mask.
    *
-   * areas   [{type: 'remove'|'erase'|'keep', x0, y0, x1, y1, colors?}]
+   * areas   [{type: 'remove'|'erase'|'keep', x0, y0, x1, y1, colors?}
+   *          | {type: 'brush', size, points: [[x, y], ...]}]
    *   remove: pixels inside the box matching any of `colors` (within the
    *           tolerance) become transparent, connected or not.
    *   erase:  everything inside the box becomes transparent.
    *   keep:   everything inside the box is kept, overriding earlier removal.
+   *   brush:  an eraser stroke; a size×size square of pixels centred on each
+   *           point becomes transparent.
    * colors  colour table, extended in place with each remove area's colours
    *         so render() can unmix their edges.
    *
@@ -238,6 +241,10 @@
     var maxDist = toleranceToDistance(options.tolerance);
     for (var a = 0; a < areas.length; a++) {
       var area = areas[a];
+      if (area.type === 'brush') {
+        eraseStroke(mask, protect, width, height, area);
+        continue;
+      }
       var r = clipRect(area, width, height);
       var ids = [];
       if (area.type === 'remove') {
@@ -270,6 +277,28 @@
     return protect;
   }
 
+  // Top-left corner of a size×size brush square centred on pixel (x, y).
+  function brushOrigin(x, y, size) {
+    var half = Math.floor(size / 2);
+    return [x - half, y - half];
+  }
+
+  function eraseStroke(mask, protect, width, height, stroke) {
+    var size = Math.max(1, stroke.size | 0);
+    var pts = stroke.points || [];
+    for (var i = 0; i < pts.length; i++) {
+      var o = brushOrigin(pts[i][0], pts[i][1], size);
+      var x0 = Math.max(0, o[0]), y0 = Math.max(0, o[1]);
+      var x1 = Math.min(width, o[0] + size), y1 = Math.min(height, o[1] + size);
+      for (var y = y0; y < y1; y++) {
+        for (var p = y * width + x0, end = y * width + x1; p < end; p++) {
+          mask[p] = ERASED;
+          protect[p] = 0;
+        }
+      }
+    }
+  }
+
   /*
    * Full pipeline: tap picks (seeds), then area edits (options.areas), then
    * render into dst. Returns pixel counts for the status line.
@@ -293,6 +322,7 @@
     toleranceToDistance: toleranceToDistance,
     buildMask: buildMask,
     applyAreas: applyAreas,
+    brushOrigin: brushOrigin,
     render: render,
     process: process,
   };

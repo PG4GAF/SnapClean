@@ -158,3 +158,22 @@ test('per-pick scope: "all" clears isolated pockets, "connected" does not', () =
   Core.process(src, dst, w, h, [{ x: 0, y: 0, scope: 'connected' }], { ...opts, contiguous: false });
   assert.strictEqual(alphaAt(dst, w, 5, 5), 255);
 });
+
+test('brush stroke erases a size×size square at each point (5×5 = 25 pixels)', () => {
+  const w = 20, h = 10;
+  const src = makeImage(w, h, [200, 100, 50, 255]);
+  const dst = new Uint8ClampedArray(src.length);
+  const stroke = { type: 'brush', size: 5, points: [[5, 5]] };
+  const r = Core.process(src, dst, w, h, [], { tolerance: 0, edgeSoftness: 30, areas: [stroke] });
+  assert.strictEqual(r.removed, 25, 'exactly 25 pixels erased');
+  assert.strictEqual(alphaAt(dst, w, 3, 3), 0);
+  assert.strictEqual(alphaAt(dst, w, 7, 7), 0);
+  assert.strictEqual(alphaAt(dst, w, 8, 5), 255, 'just outside the square untouched');
+  assert.strictEqual(alphaAt(dst, w, 2, 5), 255);
+  // Clipped at the image edge, and a later "keep" box can restore it.
+  const edge = { type: 'brush', size: 5, points: [[0, 0]] };
+  const keep = { type: 'keep', x0: 0, y0: 0, x1: 1, y1: 1 };
+  const r2 = Core.process(src, dst, w, h, [], { tolerance: 0, areas: [edge, keep] });
+  assert.strictEqual(r2.removed, 8, '3×3 visible part minus the kept pixel');
+  assert.strictEqual(alphaAt(dst, w, 0, 0), 255);
+});

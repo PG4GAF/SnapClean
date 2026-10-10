@@ -22,16 +22,21 @@ canvas + JavaScript: no server, no uploads, no account, no watermark.
      With no picks yet, it uses the colour where the drag started.
    - **Erase** – makes the whole box transparent (stray specks, shadows).
    - **Keep** – protects the box, restoring anything removed there.
-4. **Undo / Redo** in the toolbar cover every edit, including slider changes
+4. **Erase tool:** hold the mouse button (or finger) and drag to erase.
+   The brush is a square measured in real image pixels – default 5×5 = 25
+   pixels, adjustable 1×1 to 50×50 with the slider or `[` / `]` – so at high
+   zoom you erase exactly the pixels you see. A thin outline shows the brush
+   footprint; each stroke is one undo step.
+5. **Undo / Redo** in the toolbar cover every edit, including slider changes
    (keyboard: Ctrl/⌘+Z, Ctrl/⌘+Shift+Z or Ctrl+Y). **Start over** clears all
    edits and can itself be undone.
-5. **Zoom** (−, 100%, +; up to 16×, or Ctrl/⌘+wheel / pinch on trackpads)
+6. **Zoom** (−, 100%, +; up to 16×, or Ctrl/⌘+wheel / pinch on trackpads)
    for precise taps and boxes on small details; pixels render crisp when
    magnified. Use the Tap tool to scroll around while zoomed.
-6. Adjust **Tolerance** and **Edge smoothing** (fades anti-aliased edges and
+7. Adjust **Tolerance** and **Edge smoothing** (fades anti-aliased edges and
    subtracts the background colour so no halo is left); preview on checkerboard/white/black/magenta; hold
    **Hold: original** to compare.
-7. **Download PNG** exports at the image's original pixel dimensions.
+8. **Download PNG** exports at the image's original pixel dimensions.
 
 ## Android
 

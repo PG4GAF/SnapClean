@@ -184,7 +184,8 @@ main {
   touch-action: pan-x pan-y pinch-zoom;
 }
 #canvas.is-pixelated { image-rendering: pixelated; }
-.tool-area #canvas { touch-action: none; }
+.tool-area #canvas,
+.tool-erase #canvas { touch-action: none; }
 
 /* Toolbar */
 .toolbar {
@@ -287,7 +288,21 @@ main {
   outline: 3px solid color-mix(in srgb, var(--primary) 50%, transparent);
   outline-offset: 1px;
 }
-.tool-area .pick-mode { display: none; }
+.tool-area .pick-mode,
+.tool-erase .pick-mode { display: none; }
+
+/* Eraser */
+.brush-row { display: none; align-items: center; gap: 10px; margin-bottom: 10px; }
+.tool-erase .brush-row { display: flex; }
+.brush-row input[type="range"] { flex: 1; max-width: 260px; height: 28px; }
+.brush-size-out { font-variant-numeric: tabular-nums; font-weight: 600; font-size: 0.9rem; min-width: 7.5em; }
+.tool-erase #canvas { cursor: none; }
+/* Outline-only brush footprint: shows exactly which pixels will be erased. */
+.brush-cursor {
+  position: absolute;
+  pointer-events: none;
+  box-shadow: 0 0 0 1px #fff, 0 0 0 2px rgba(0, 0, 0, 0.85);
+}
 .area-bar {
   display: flex;
   flex-wrap: wrap;
@@ -429,6 +444,7 @@ input[type="range"] {
   /* Small phones: icon-only tools so the whole toolbar fits on one row. */
   .tool span { display: none; }
   .toolbar { gap: 6px; }
+  .tool { min-width: 36px; padding: 6px 4px; }
   .tool-zoom { min-width: 52px; }
 }
 

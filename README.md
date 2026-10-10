@@ -1,7 +1,8 @@
 # SnapClean
 
-Remove a flat, solid-colour background from a PNG or JPG and download a
-full-resolution transparent PNG. Everything runs in the browser with
+Remove a flat, solid-colour background from a PNG or JPG – or build a
+transparent PNG from two exports of a design on black and on white – and
+download a full-resolution transparent PNG. Everything runs in the browser with
 canvas + JavaScript: no server, no uploads, no account, no watermark.
 
 ## How it works
@@ -38,6 +39,45 @@ canvas + JavaScript: no server, no uploads, no account, no watermark.
    **Hold: original** to compare.
 8. **Download PNG** exports at the image's original pixel dimensions.
 
+## Black + white mode (Canva → transparent PNG)
+
+Canva's free plan can't export transparent PNGs, and background removers
+cap resolution or eat soft glows. Instead, export the same design twice –
+once on pure black, once on pure white – and SnapClean recovers the exact
+transparency from the difference, keeping glows, shadows and anti-aliasing
+as semi-transparent pixels at full resolution.
+
+### Exporting the two files from Canva
+
+1. Create the design at your print size, e.g. **Custom size → 4500 × 5400 px**
+   (Printify's sweatshirt size). Don't resize between the two exports.
+2. Click an empty part of the page, choose **Background colour** and set it
+   to **#000000** (pure black).
+3. **Share → Download → File type: PNG**. Leave *Transparent background*
+   unticked. Download and name it e.g. `design-black.png`.
+4. Change the background colour to **#FFFFFF** (pure white) – change nothing
+   else – and download again as **PNG** (`design-white.png`).
+5. In SnapClean, open the **Black + white (Canva)** tab, put each file in its
+   slot (*On black* / *On white*) and press **Create transparent PNG**.
+   Check the preview over the checkerboard, black, white or grey, then
+   **Download PNG**. **Edit further** opens the result in the editor (eraser,
+   area tools) for touch-ups.
+
+Use PNG for both – JPG compression changes pixels differently in each file
+and breaks the maths, so JPGs are rejected. Both files must be exactly the
+same size. Any alpha channel in the inputs is ignored.
+
+### How it works
+
+Per pixel, with channels in 0–1: `alpha = 1 − (white − black)` (average of
+R, G, B, or optionally the largest channel difference), clamped to 0–1;
+`colour = black / alpha` (or 0 where alpha ≈ 0). The result is written at the
+original size and encoded as a lossless PNG – no resizing or recompression.
+It runs in a Web Worker on typed arrays: a 4500 × 5400 image takes about
+1–2 s without freezing the page. Very large images may exceed the canvas
+limit of iPhone/iPad Safari (about 16.7 megapixels); use a desktop browser or
+Chrome on Android for 4500 × 5400.
+
 ## Android
 
 SnapClean is an installable Progressive Web App, so on Android it behaves
@@ -68,10 +108,14 @@ or [PWABuilder](https://www.pwabuilder.com/) without changing the code.
 | `css/style.css` | Mobile-first styles (light/dark) |
 | `js/core.js` | Pure pixel processing: scanline flood fill, edge smoothing. No DOM, unit-tested in Node |
 | `js/app.js` | UI: loading, tap-to-pick, preview, export, share, install |
+| `js/twobg.js` | Black + white pipeline: decode both PNGs, combine, encode PNG |
+| `js/twobg-worker.js` | Web Worker that runs the pipeline off the main thread |
+| `js/twobg-ui.js` | Black + white mode UI: upload slots, validation, preview, download |
 | `manifest.webmanifest` | PWA manifest (install, icons, Android share target) |
 | `sw.js` | Service worker: offline cache + receiving shared images |
 | `icons/` | App icons (regular + Android maskable) |
-| `test/core.test.js` | Tests for `core.js` |
+| `test/core.test.js` | Tests for `core.js` (colour key, areas, eraser) |
+| `test/twobg.test.js` | Tests for the black + white combine (glow round-trip, sizes, transparency) |
 
 No build step and no dependencies.
 

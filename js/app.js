@@ -645,13 +645,20 @@
       els.dropZone.classList.remove('is-dragging');
     });
   });
+  // The other mode (Black + white) handles its own drops and keys.
+  function inKeyMode() {
+    return document.body.dataset.mode !== 'twobg';
+  }
+
   window.addEventListener('drop', function (e) {
+    if (!inKeyMode()) return;
     var f = e.dataTransfer && e.dataTransfer.files[0];
     if (f) loadFile(f);
   });
 
   // Paste from clipboard.
   window.addEventListener('paste', function (e) {
+    if (!inKeyMode()) return;
     var items = (e.clipboardData && e.clipboardData.files) || [];
     for (var i = 0; i < items.length; i++) {
       if (isSupported(items[i])) { loadFile(items[i]); return; }
@@ -773,7 +780,7 @@
   // Keyboard: Ctrl/⌘+Z undo, Ctrl/⌘+Shift+Z or Ctrl+Y redo, +/−/0 zoom,
   // Esc cancels a selection.
   document.addEventListener('keydown', function (e) {
-    if (!state.src || els.editor.hidden) return;
+    if (!state.src || els.editor.hidden || !inKeyMode()) return;
     var mod = e.ctrlKey || e.metaKey;
     var k = e.key.toLowerCase();
     if (mod && k === 'z') { e.preventDefault(); if (e.shiftKey) redo(); else undo(); }
@@ -801,9 +808,9 @@
   });
   els.compareBtn.addEventListener('keyup', function () { setComparing(false); });
 
-  document.querySelectorAll('.bg-opt').forEach(function (btn) {
+  document.querySelectorAll('#editor .bg-opt').forEach(function (btn) {
     btn.addEventListener('click', function () {
-      document.querySelectorAll('.bg-opt').forEach(function (b) {
+      document.querySelectorAll('#editor .bg-opt').forEach(function (b) {
         b.classList.toggle('is-active', b === btn);
         b.setAttribute('aria-checked', b === btn ? 'true' : 'false');
       });
@@ -813,6 +820,9 @@
   });
 
   els.downloadBtn.addEventListener('click', download);
+
+  // Small API for the Black + white mode ("Edit further").
+  window.SnapCleanApp = { loadFile: loadFile };
   if (canShareFiles) {
     els.shareBtn.hidden = false;
     els.shareBtn.addEventListener('click', share);

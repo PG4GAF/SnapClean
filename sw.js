@@ -4,7 +4,7 @@
  * - Receives images shared from other Android apps (Web Share Target) and
  *   hands them to the page via a temporary cache entry.
  */
-var VERSION = 'snapclean-v4';
+var VERSION = 'snapclean-v5';
 var SHARE_CACHE = 'snapclean-share';
 var SHELL = [
   './',
@@ -12,6 +12,9 @@ var SHELL = [
   'css/style.css',
   'js/core.js',
   'js/app.js',
+  'js/twobg.js',
+  'js/twobg-worker.js',
+  'js/twobg-ui.js',
   'manifest.webmanifest',
   'icons/icon-192.png',
   'icons/icon-512.png',

@@ -12,7 +12,7 @@
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%234f46e5'/%3E%3Cpath d='M9 22l5-9 4 6 2-3 3 6z' fill='white'/%3E%3C/svg%3E">
   <link rel="stylesheet" href="css/style.css">
 </head>
-<body>
+<body data-mode="key">
   <header class="topbar">
     <h1 class="brand">Snap<span>Clean</span></h1>
     <div class="topbar-actions">
@@ -22,12 +22,83 @@
   </header>
 
   <main>
+    <nav class="mode-tabs" role="tablist" aria-label="Mode">
+      <button type="button" class="mode-tab is-active" role="tab" id="tabKey" data-mode="key" aria-selected="true">Solid colour</button>
+      <button type="button" class="mode-tab" role="tab" id="tabTwoBg" data-mode="twobg" aria-selected="false">Black + white <span class="mode-tab-sub">(Canva)</span></button>
+    </nav>
+
+    <!-- Mode: transparent PNG from two backgrounds -->
+    <section id="twoBg" class="twobg" role="tabpanel" aria-labelledby="tabTwoBg">
+      <div class="twobg-intro">
+        <h2 class="twobg-title">Transparent PNG from two backgrounds</h2>
+        <p class="field-help">Export the same design twice as PNG at the same size – once on pure black, once on pure white. SnapClean works out the exact transparency, keeping soft glows and shadows, at full resolution.</p>
+      </div>
+
+      <div class="slots">
+        <div class="slot" data-slot="black">
+          <span class="slot-title"><span class="slot-chip" style="background:#000"></span>On black</span>
+          <label class="slot-drop">
+            <img class="slot-img" alt="" hidden>
+            <span class="slot-empty">Choose or drop PNG</span>
+            <input type="file" accept="image/png,.png" hidden>
+          </label>
+          <p class="slot-info field-help"></p>
+        </div>
+        <div class="slot" data-slot="white">
+          <span class="slot-title"><span class="slot-chip" style="background:#fff"></span>On white</span>
+          <label class="slot-drop">
+            <img class="slot-img" alt="" hidden>
+            <span class="slot-empty">Choose or drop PNG</span>
+            <input type="file" accept="image/png,.png" hidden>
+          </label>
+          <p class="slot-info field-help"></p>
+        </div>
+      </div>
+
+      <div class="twobg-actions">
+        <button id="swapBtn" class="btn" type="button" disabled title="Swap the two images">⇄ Swap</button>
+        <label class="select-label">Alpha from
+          <select id="alphaMethod">
+            <option value="average">Average of R, G, B</option>
+            <option value="max">Largest channel difference</option>
+          </select>
+        </label>
+        <button id="combineBtn" class="btn btn-primary btn-lg" type="button" disabled>Create transparent PNG</button>
+      </div>
+
+      <p id="twoBgMsg" class="msg" role="alert" hidden></p>
+      <p id="twoBgNote" class="msg msg-info" hidden></p>
+      <p id="twoBgStatus" class="status" aria-live="polite"></p>
+
+      <div id="twoBgResult" class="twobg-result" hidden>
+        <div class="field">
+          <span class="field-label">Preview background</span>
+          <div class="bg-options" role="radiogroup" aria-label="Preview background">
+            <button type="button" class="bg-opt bg-checker is-active" data-bg="checker" aria-label="Checkerboard" role="radio" aria-checked="true"></button>
+            <button type="button" class="bg-opt" data-bg="white" style="background:#fff" aria-label="White" role="radio" aria-checked="false"></button>
+            <button type="button" class="bg-opt" data-bg="black" style="background:#000" aria-label="Black" role="radio" aria-checked="false"></button>
+            <button type="button" class="bg-opt" data-bg="heather" style="background:#9aa3ad" aria-label="Grey (heather sweatshirt)" role="radio" aria-checked="false"></button>
+          </div>
+        </div>
+        <div id="twoBgStage" class="stage bg-checker twobg-stage">
+          <img id="twoBgImg" class="twobg-img" alt="Transparent result preview">
+        </div>
+        <p id="twoBgInfo" class="field-help"></p>
+        <div class="export-buttons">
+          <button id="twoBgDownload" class="btn btn-primary btn-lg btn-block" type="button">Download PNG</button>
+          <button id="twoBgShare" class="btn btn-lg" type="button" hidden>Share</button>
+          <button id="twoBgEdit" class="btn btn-lg" type="button" title="Open in the editor to erase leftovers">Edit further</button>
+        </div>
+      </div>
+    </section>
+
     <!-- Step 1: pick a file -->
     <section id="dropZone" class="dropzone">
       <div class="dropzone-inner">
         <svg class="dropzone-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4m0 0l-4 4m4-4l4 4M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
         <p class="dropzone-title">Remove a solid background</p>
         <p class="dropzone-sub">PNG or JPG · stays on your device · full-resolution PNG out</p>
+        <p class="dropzone-sub">Made in Canva with soft glows? Use <strong>Black + white</strong> mode above.</p>
         <label class="btn btn-primary btn-lg">
           Choose image
           <input id="fileInput" type="file" accept="image/png,image/jpeg,.png,.jpg,.jpeg" hidden>
@@ -166,5 +237,7 @@
 
   <script src="js/core.js"></script>
   <script src="js/app.js"></script>
+  <script src="js/twobg.js"></script>
+  <script src="js/twobg-ui.js"></script>
 </body>
 </html>

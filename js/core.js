@@ -315,6 +315,73 @@
     return { removed: removed, total: mask.length };
   }
 
+  /*
+   * Recover a transparent image from two renders of the same design, one on
+   * pure black and one on pure white ("difference matting").
+   *
+   * With channel values in 0..1, a pixel of colour F and opacity a renders as
+   *   on black: B = a*F          on white: W = a*F + (1 - a)
+   * so  a = 1 - (W - B)  and  F = B / a.
+   *
+   * black, white  {data, width, height} RGBA (e.g. ImageData). Their alpha
+   *               channels are ignored.
+   * out           Uint8ClampedArray (or {data}) of the same length; receives
+   *               the RGBA result at full resolution.
+   * options       {alpha: 'average' (default, mean of R,G,B differences)
+   *                       | 'max' (largest channel difference)}
+   *
+   * Throws if the two images differ in size. Returns pixel counts, including
+   * `inverted`: pixels clearly darker on white than on black, which means
+   * the two files were probably swapped.
+   */
+  function checkSameSize(black, white) {
+    if (black.width !== white.width || black.height !== white.height) {
+      throw new Error('The two images must be the same size: "On black" is ' +
+        black.width + ' × ' + black.height + ' px but "On white" is ' +
+        white.width + ' × ' + white.height + ' px. Export both from the same design without resizing.');
+    }
+  }
+
+  function combineBlackWhite(black, white, out, options) {
+    checkSameSize(black, white);
+    var useMax = options && options.alpha === 'max';
+    var b = black.data, w = white.data, o = out.data || out;
+    var n = black.width * black.height * 4;
+    var transparent = 0, opaque = 0, inverted = 0;
+    for (var i = 0; i < n; i += 4) {
+      var dr = w[i] - b[i], dg = w[i + 1] - b[i + 1], db = w[i + 2] - b[i + 2];
+      var d = useMax
+        ? (dr > dg ? (dr > db ? dr : db) : (dg > db ? dg : db))
+        : (dr + dg + db) / 3;
+      var a = 255 - d; // alpha on a 0..255 scale
+      if (d < -16) inverted++;
+      if (a < 0.5) {
+        // Fully transparent (or noise where white < black): no colour.
+        o[i] = o[i + 1] = o[i + 2] = o[i + 3] = 0;
+        transparent++;
+        continue;
+      }
+      var A = a >= 255 ? 255 : Math.round(a);
+      // Un-premultiply with the stored (rounded) alpha so that compositing the
+      // result reproduces the inputs as closely as 8 bits allow. The clamped
+      // array clamps colour to 0..255.
+      var k = 255 / A;
+      o[i] = b[i] * k;
+      o[i + 1] = b[i + 1] * k;
+      o[i + 2] = b[i + 2] * k;
+      o[i + 3] = A;
+      if (A === 255) opaque++;
+    }
+    var total = n / 4;
+    return {
+      transparent: transparent,
+      opaque: opaque,
+      partial: total - transparent - opaque,
+      inverted: inverted,
+      total: total,
+    };
+  }
+
   return {
     MAX_SEEDS: MAX_SEEDS,
     colorAt: colorAt,
@@ -323,6 +390,8 @@
     buildMask: buildMask,
     applyAreas: applyAreas,
     brushOrigin: brushOrigin,
+    checkSameSize: checkSameSize,
+    combineBlackWhite: combineBlackWhite,
     render: render,
     process: process,
   };
